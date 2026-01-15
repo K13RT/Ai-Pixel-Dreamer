@@ -1,0 +1,5 @@
+{
+  "name": "AI Pixel Dreamer",
+  "description": "A SaaS platform for indie game developers to generate game-ready pixel art assets, animations, and perform style transfer using Generative AI.",
+  "requestFramePermissions": []
+}
