@@ -4,6 +4,22 @@ import { ArtStyle, SpriteSize, ImageResolution } from "../types";
 // Helper to get client with current key
 const getAiClient = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Helper to extract image or throw descriptive error
+const extractImageOrThrow = (response: any, defaultError: string) => {
+    const parts = response.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
+    }
+    // If no image, check for text (refusal or description)
+    const textPart = parts.find((p: any) => p.text);
+    if (textPart?.text) {
+        throw new Error(textPart.text); // Return the model's explanation
+    }
+    throw new Error(defaultError);
+};
+
 export const generateStandardSprite = async (
   prompt: string,
   size: SpriteSize,
@@ -11,7 +27,7 @@ export const generateStandardSprite = async (
 ): Promise<string> => {
   const ai = getAiClient();
   try {
-    const fullPrompt = `Generate a pixel art sprite. 
+    const fullPrompt = `Create an image of a pixel art sprite. 
     Subject: ${prompt}. 
     Style: ${style}. 
     Resolution: ${size} pixels. 
@@ -28,12 +44,7 @@ export const generateStandardSprite = async (
       },
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("No image data found in response");
+    return extractImageOrThrow(response, "No image data found in response");
   } catch (error) {
     console.error("Error generating sprite:", error);
     throw error;
@@ -66,12 +77,7 @@ export const generateProSprite = async (
       },
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("No image data found in response");
+    return extractImageOrThrow(response, "No image data found in response");
   } catch (error) {
     console.error("Error generating pro sprite:", error);
     throw error;
@@ -106,12 +112,7 @@ export const editPixelSprite = async (
       }
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Failed to edit image");
+    return extractImageOrThrow(response, "Failed to edit image");
   } catch (error) {
     console.error("Error editing sprite:", error);
     throw error;
@@ -155,12 +156,8 @@ export const generatePixelAnimationFrames = async (
             }
           });
 
-          for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-              return [`data:image/png;base64,${part.inlineData.data}`];
-            }
-          }
-          throw new Error("Failed to generate animation frames");
+          // Animation frames return a single image (the sheet/row)
+          return [extractImageOrThrow(response, "Failed to generate animation frames")];
 
     } catch (error) {
         console.error("Error generating animation:", error);
@@ -194,12 +191,7 @@ export const convertToPixelArt = async (imageBase64: string): Promise<string> =>
             },
           });
 
-          for (const part of response.candidates?.[0]?.content?.parts || []) {
-            if (part.inlineData) {
-              return `data:image/png;base64,${part.inlineData.data}`;
-            }
-          }
-          throw new Error("Failed to convert image");
+          return extractImageOrThrow(response, "Failed to convert image");
     } catch (error) {
         console.error("Style transfer error:", error);
         throw error;
@@ -231,12 +223,7 @@ export const generateBackgroundRemoval = async (imageBase64: string): Promise<st
       },
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Failed to process background");
+    return extractImageOrThrow(response, "Failed to process background");
   } catch (error) {
     console.error("Background removal error:", error);
     throw error;
@@ -265,7 +252,7 @@ export const generateTileSet = async (
         Ensure all edges match perfectly to create a coherent map surface. White background.`;
     }
 
-    const fullPrompt = `Generate pixel art game tiles.
+    const fullPrompt = `Create an image of pixel art game tiles.
     Style: ${style}.
     ${specificInstruction}
     Ensure crisp pixel art, no blurring.`;
@@ -280,12 +267,7 @@ export const generateTileSet = async (
       },
     });
 
-    for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("No image data found in response");
+    return extractImageOrThrow(response, "No image data found in response");
   } catch (error) {
     console.error("Error generating tileset:", error);
     throw error;

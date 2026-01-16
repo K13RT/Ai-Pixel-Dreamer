@@ -21,7 +21,6 @@ import {
   Settings,
   Monitor,
   Scissors,
-  Wand,
   Repeat,
   Gauge,
   Images,
@@ -105,13 +104,14 @@ const App: React.FC = () => {
     const errorMessage = err.message || err.toString();
     console.error("API Error:", errorMessage);
     
-    // Handle Permission Denied (403) or Not Found (404) by forcing key selection
+    // Handle Permission Denied (403) or Not Found (404) or Refusals by forcing key selection
     if (
         errorMessage.includes("403") || 
         errorMessage.includes("Permission") || 
         errorMessage.includes("permission") ||
         errorMessage.includes("not found") ||
-        errorMessage.includes("404")
+        errorMessage.includes("404") ||
+        errorMessage.includes("API key")
     ) {
         if (window.aistudio) {
             try {
@@ -151,6 +151,7 @@ const App: React.FC = () => {
     if (!prompt) return;
     setIsGenerating(true);
     setError(null);
+    await ensureApiKey();
 
     try {
       const effectiveStyle = style === ArtStyle.CUSTOM ? customStyle : style;
@@ -173,6 +174,7 @@ const App: React.FC = () => {
     if (!generatedImage || !editPrompt) return;
     setIsGenerating(true);
     setError(null);
+    await ensureApiKey();
     try {
         const result = await GeminiService.editPixelSprite(generatedImage, editPrompt);
         setGeneratedImage(result);
@@ -191,6 +193,7 @@ const App: React.FC = () => {
     }
     setIsGenerating(true);
     setError(null);
+    await ensureApiKey();
     try {
       const frames = await GeminiService.generatePixelAnimationFrames(
           generatedImage, 
@@ -210,6 +213,7 @@ const App: React.FC = () => {
     if (!generatedImage) return;
     setIsGenerating(true);
     setError(null);
+    await ensureApiKey();
     try {
         // Use Gemini to isolate subject on Magenta background
         const result = await GeminiService.generateBackgroundRemoval(generatedImage);
@@ -250,6 +254,8 @@ const App: React.FC = () => {
             const base64 = reader.result as string;
             if (currentMode === AppMode.STYLE_TRANSFER) {
                  setIsGenerating(true);
+                 setError(null);
+                 await ensureApiKey();
                  try {
                      const pixelArt = await GeminiService.convertToPixelArt(base64);
                      setGeneratedImage(pixelArt);
@@ -624,8 +630,7 @@ const App: React.FC = () => {
                 <div className="space-y-6">
                      <InfoBox borderColor="border-pink-500/50" textColor="text-pink-300">
                         > CÔNG CỤ: TÁCH NỀN<br/>
-                        > 1. TẢI ẢNH LÊN<br/>
-                        > 2. DÙNG ĐŨA THẦN (TOOLBAR)
+                        > SỬ DỤNG AI ĐỂ TÁCH NỀN TỰ ĐỘNG
                     </InfoBox>
 
                     <div>
@@ -633,13 +638,9 @@ const App: React.FC = () => {
                          <FileInput onChange={handleFileUpload} />
                     </div>
 
-                     <div className="p-3 bg-cyber-black border border-cyber-dim text-[10px] text-cyber-dim font-mono mb-4">
-                        Mẹo: Sử dụng công cụ "Đũa Thần" <Wand size={10} className="inline"/> trên thanh công cụ để xóa màu nền bằng 1 cú click.
-                     </div>
-
                     <div>
                         <Label>2. CHUẨN HÓA NỀN (AI)</Label>
-                        <p className="text-[10px] text-cyber-dim mb-2">Nếu nền quá phức tạp, dùng AI để đổi nền sang màu đơn sắc (Hồng/Xanh) rồi dùng Đũa Thần.</p>
+                        <p className="text-[10px] text-cyber-dim mb-2">Dùng AI để đổi nền sang màu đơn sắc (Hồng/Xanh) để dễ dàng xử lý trong Game Engine.</p>
                         <ActionButton 
                             onClick={handleBackgroundRemoval}
                             disabled={isGenerating || !generatedImage}

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Download, Eraser, Pen, ZoomIn, ZoomOut, Wand, PaintBucket } from 'lucide-react';
+import { Download, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface PixelEditorProps {
   imageUrl: string | null;
@@ -9,9 +9,6 @@ interface PixelEditorProps {
 const PixelEditor: React.FC<PixelEditorProps> = ({ imageUrl, onSave }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(1);
-  const [tool, setTool] = useState<'pen' | 'eraser' | 'magic-wand' | 'fill-bucket'>('pen');
-  const [color, setColor] = useState('#000000');
-  const [isDrawing, setIsDrawing] = useState(false);
 
   // Load image into canvas
   useEffect(() => {
@@ -41,153 +38,6 @@ const PixelEditor: React.FC<PixelEditorProps> = ({ imageUrl, onSave }) => {
     link.click();
   };
 
-  const getCoordinates = (e: React.MouseEvent) => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
-    const rect = canvasRef.current.getBoundingClientRect();
-    // Calculate position relative to canvas
-    const x = Math.floor((e.clientX - rect.left) / (rect.width / canvasRef.current.width));
-    const y = Math.floor((e.clientY - rect.top) / (rect.height / canvasRef.current.height));
-    return { x, y };
-  };
-
-  const removeColor = (startX: number, startY: number) => {
-    if (!canvasRef.current) return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    const { width, height } = canvasRef.current;
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-
-    // Get color at clicked position
-    const targetIndex = (startY * width + startX) * 4;
-    const r = data[targetIndex];
-    const g = data[targetIndex + 1];
-    const b = data[targetIndex + 2];
-    const a = data[targetIndex + 3];
-
-    // Don't do anything if clicking already transparent pixel
-    if (a === 0) return;
-
-    // Global Color Replacement (Replace all pixels of this color)
-    // Tolerance is low because pixel art usually has solid colors
-    const tolerance = 15; 
-
-    for (let i = 0; i < data.length; i += 4) {
-        if (Math.abs(data[i] - r) <= tolerance &&
-            Math.abs(data[i + 1] - g) <= tolerance &&
-            Math.abs(data[i + 2] - b) <= tolerance &&
-            data[i+3] > 0) {
-            
-            data[i + 3] = 0; // Set Alpha to 0 (Transparent)
-        }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-  };
-
-  const floodFill = (startX: number, startY: number) => {
-    if (!canvasRef.current) return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    const { width, height } = canvasRef.current;
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-
-    // Helper to convert hex to RGB
-    const hexToRgb = (hex: string) => {
-      const r = parseInt(hex.slice(1, 3), 16);
-      const g = parseInt(hex.slice(3, 5), 16);
-      const b = parseInt(hex.slice(5, 7), 16);
-      return { r, g, b };
-    };
-
-    const targetIndex = (startY * width + startX) * 4;
-    const targetR = data[targetIndex];
-    const targetG = data[targetIndex + 1];
-    const targetB = data[targetIndex + 2];
-    const targetA = data[targetIndex + 3];
-
-    const fillColor = hexToRgb(color);
-    const fillA = 255;
-
-    // If filling with the exact same color, do nothing to prevent infinite loops
-    if (targetR === fillColor.r && targetG === fillColor.g && targetB === fillColor.b && targetA === fillA) {
-        return;
-    }
-
-    // Stack-based flood fill
-    const pixelStack = [[startX, startY]];
-
-    while (pixelStack.length) {
-      const newPos = pixelStack.pop();
-      if(!newPos) continue;
-      
-      const x = newPos[0];
-      const y = newPos[1];
-
-      // Boundary check
-      if (x < 0 || x >= width || y < 0 || y >= height) continue;
-
-      const pixelPos = (y * width + x) * 4;
-
-      // Check if current pixel matches target color
-      // We use exact match for pixel art precision
-      if (
-        data[pixelPos] === targetR &&
-        data[pixelPos + 1] === targetG &&
-        data[pixelPos + 2] === targetB &&
-        data[pixelPos + 3] === targetA
-      ) {
-        // Fill pixel
-        data[pixelPos] = fillColor.r;
-        data[pixelPos + 1] = fillColor.g;
-        data[pixelPos + 2] = fillColor.b;
-        data[pixelPos + 3] = fillA;
-
-        // Add neighbors to stack
-        pixelStack.push([x + 1, y]);
-        pixelStack.push([x - 1, y]);
-        pixelStack.push([x, y + 1]);
-        pixelStack.push([x, y - 1]);
-      }
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-  };
-
-  const draw = (e: React.MouseEvent) => {
-    if (!isDrawing || !canvasRef.current || tool === 'magic-wand' || tool === 'fill-bucket') return;
-    const ctx = canvasRef.current.getContext('2d');
-    if (!ctx) return;
-
-    const { x, y } = getCoordinates(e);
-
-    if (tool === 'pen') {
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, 1, 1);
-    } else if (tool === 'eraser') {
-      ctx.clearRect(x, y, 1, 1);
-    }
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const { x, y } = getCoordinates(e);
-    if (tool === 'magic-wand') {
-        removeColor(x, y);
-    } else if (tool === 'fill-bucket') {
-        floodFill(x, y);
-    } else {
-        setIsDrawing(true);
-        draw(e);
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDrawing(false);
-  };
-
   if (!imageUrl) {
     return (
       <div className="h-full w-full flex flex-col items-center justify-center text-cyber-dim bg-cyber-black/80 relative overflow-hidden">
@@ -206,42 +56,9 @@ const PixelEditor: React.FC<PixelEditorProps> = ({ imageUrl, onSave }) => {
       {/* Toolbar */}
       <div className="flex items-center justify-between p-2 bg-cyber-panel border-b-2 border-cyber-dim z-20 shadow-md">
         <div className="flex gap-2">
-            <button 
-                onClick={() => setTool('pen')}
-                className={`p-2 border-2 transition-all ${tool === 'pen' ? 'bg-cyber-secondary border-cyber-secondary text-cyber-black' : 'border-cyber-dim text-cyber-dim hover:text-cyber-text'}`}
-                title="Bút vẽ"
-            >
-                <Pen size={16} />
-            </button>
-            <button 
-                onClick={() => setTool('eraser')}
-                className={`p-2 border-2 transition-all ${tool === 'eraser' ? 'bg-cyber-primary border-cyber-primary text-white' : 'border-cyber-dim text-cyber-dim hover:text-cyber-text'}`}
-                title="Tẩy"
-            >
-                <Eraser size={16} />
-            </button>
-            <button 
-                onClick={() => setTool('fill-bucket')}
-                className={`p-2 border-2 transition-all ${tool === 'fill-bucket' ? 'bg-cyber-accent border-cyber-accent text-cyber-black' : 'border-cyber-dim text-cyber-dim hover:text-cyber-text'}`}
-                title="Thùng sơn (Fill Bucket) - Tô màu vùng liền kề"
-            >
-                <PaintBucket size={16} />
-            </button>
-            <button 
-                onClick={() => setTool('magic-wand')}
-                className={`p-2 border-2 transition-all ${tool === 'magic-wand' ? 'bg-cyber-dim border-cyber-dim text-white' : 'border-cyber-dim text-cyber-dim hover:text-cyber-text'}`}
-                title="Đũa thần (Xóa nền) - Xóa tất cả pixel cùng màu"
-            >
-                <Wand size={16} />
-            </button>
-            <div className="border-2 border-cyber-dim p-1 flex items-center bg-cyber-black">
-                <input 
-                    type="color" 
-                    value={color}
-                    onChange={(e) => setColor(e.target.value)}
-                    className="w-6 h-6 border-0 p-0 cursor-pointer bg-transparent"
-                />
-            </div>
+             <div className="text-xs font-mono text-cyber-dim uppercase flex items-center h-full px-2">
+                Trình Xem (View Mode)
+             </div>
         </div>
         
         <div className="flex items-center bg-cyber-black border-2 border-cyber-dim px-2 py-1 gap-2">
@@ -284,17 +101,13 @@ const PixelEditor: React.FC<PixelEditorProps> = ({ imageUrl, onSave }) => {
         >
             <canvas
                 ref={canvasRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={draw}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-                className={`block ${tool === 'magic-wand' || tool === 'fill-bucket' ? 'cursor-pointer' : 'cursor-crosshair'}`}
+                className="block cursor-default"
             />
         </div>
       </div>
       
       <div className="px-4 py-1 bg-cyber-panel text-[10px] text-cyber-dim text-center font-mono border-t-2 border-cyber-dim uppercase tracking-widest">
-        KÍCH THƯỚC: {canvasRef.current?.width}x{canvasRef.current?.height}PX // CÔNG CỤ: {tool === 'pen' ? 'BÚT' : tool === 'eraser' ? 'TẨY' : tool === 'fill-bucket' ? 'THÙNG SƠN' : 'ĐŨA THẦN'}
+        KÍCH THƯỚC: {canvasRef.current?.width}x{canvasRef.current?.height}PX
       </div>
     </div>
   );
